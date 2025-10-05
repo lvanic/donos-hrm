@@ -1,0 +1,28 @@
+{{define "list"}}
+{{template "layout" .}}
+{{end}}
+
+{{define "page_title"}}Complaints{{end}}
+
+{{define "list_body"}}
+<section class="container">
+    <h1>Complaints</h1>
+    {{if not .Complaints}}
+    <p>No complaints submitted yet.</p>
+    {{else}}
+    <ul class="complaints">
+        {{range .Complaints}}
+        <li>
+            <div class="meta">
+                <span class="subject">{{.Subject}}</span>
+                <span class="reporter">{{.Reporter}}</span>
+                <span class="created">{{.CreatedAt}}</span>
+            </div>
+            <p>{{.Description}}</p>
+        </li>
+        {{end}}
+    </ul>
+    {{end}}
+</section>
+{{end}}
+

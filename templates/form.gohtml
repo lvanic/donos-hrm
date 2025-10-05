@@ -1,0 +1,24 @@
+{{define "form"}}
+{{template "layout" .}}
+{{end}}
+
+{{define "page_title"}}Submit Complaint{{end}}
+
+{{define "form_body"}}
+<section class="container">
+    <h1>Submit a Complaint</h1>
+    {{if .Error}}
+    <p class="error">{{.Error}}</p>
+    {{end}}
+    <form method="post" action="/">
+        <label for="subject">Subject</label>
+        <input type="text" id="subject" name="subject" required>
+
+        <label for="description">Description</label>
+        <textarea id="description" name="description" rows="5" required></textarea>
+
+        <button type="submit">Submit</button>
+    </form>
+</section>
+{{end}}
+

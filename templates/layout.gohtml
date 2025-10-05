@@ -1,0 +1,37 @@
+{{define "layout"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{block "page_title" .}}Donos HRM{{end}}</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <a href="/">Submit Complaint</a>
+            <a href="/complaints">View Complaints</a>
+            {{if .Email}}
+            <form action="/logout" method="post" class="logout">
+                <span class="user">{{.Email}}</span>
+                <button type="submit">Logout</button>
+            </form>
+            {{else}}
+            <a href="/login">Login</a>
+            {{end}}
+        </nav>
+    </header>
+    <main>
+        {{if eq .ContentTemplate "form"}}
+        {{template "form_body" .}}
+        {{else if eq .ContentTemplate "list"}}
+        {{template "list_body" .}}
+        {{else}}
+        {{block "page_content" .}}{{end}}
+        {{end}}
+    </main>
+</body>
+</html>
+{{end}}
+
