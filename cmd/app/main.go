@@ -38,7 +38,7 @@ func main() {
 	if dataFile == "" {
 		dataFile = "data/complaints.json"
 	}
-	
+
 	// Создаем директорию если не существует
 	if err := os.MkdirAll("data", 0755); err != nil {
 		log.Fatalf("failed to create data directory: %v", err)
@@ -73,7 +73,7 @@ func main() {
 	r.HandleFunc("/login", h.HandleLogin()).Methods(http.MethodGet)
 	r.HandleFunc("/auth/google/callback", h.HandleCallback()).Methods(http.MethodGet)
 	r.HandleFunc("/logout", h.HandleLogout()).Methods(http.MethodPost)
-	
+
 	// Admin routes
 	r.HandleFunc("/admin", h.RequireAdmin(h.HandleAdmin())).Methods(http.MethodGet)
 	r.HandleFunc("/admin/toggle", h.RequireAdmin(h.HandleToggleHidden())).Methods(http.MethodPost)
