@@ -82,4 +82,71 @@ button:hover {
     font-weight: bold;
 }
 
+/* Admin Panel Styles */
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.admin-table th,
+.admin-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.admin-table th {
+    background: #f8f9fa;
+    font-weight: bold;
+}
+
+.hidden-row {
+    opacity: 0.6;
+    background: #f8f9fa;
+}
+
+.description-row td {
+    padding-top: 0;
+    padding-bottom: 1rem;
+}
+
+.complaint-description {
+    font-size: 0.9rem;
+    color: #666;
+    padding-left: 1rem;
+    border-left: 3px solid #ddd;
+}
+
+.status-hidden {
+    color: #dc2626;
+    font-weight: bold;
+}
+
+.status-visible {
+    color: #16a34a;
+    font-weight: bold;
+}
+
+.btn-toggle {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+
+.btn-hide {
+    background: #dc2626;
+}
+
+.btn-hide:hover {
+    background: #b91c1c;
+}
+
+.btn-show {
+    background: #16a34a;
+}
+
+.btn-show:hover {
+    background: #15803d;
+}
+
 

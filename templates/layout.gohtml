@@ -13,6 +13,9 @@
             <a href="/">Submit Complaint</a>
             <a href="/complaints">View Complaints</a>
             {{if .Email}}
+            {{if .IsAdmin}}
+            <a href="/admin">Admin Panel</a>
+            {{end}}
             <form action="/logout" method="post" class="logout">
                 <span class="user">{{.Email}}</span>
                 <button type="submit">Logout</button>
@@ -27,6 +30,8 @@
         {{template "form_body" .}}
         {{else if eq .ContentTemplate "list"}}
         {{template "list_body" .}}
+        {{else if eq .ContentTemplate "admin"}}
+        {{template "admin_body" .}}
         {{else}}
         {{block "page_content" .}}{{end}}
         {{end}}

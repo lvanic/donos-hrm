@@ -34,6 +34,11 @@ COPY --from=builder /out/app /app/app
 COPY templates ./templates
 COPY static ./static
 
+# Create data directory with write permissions
+# Note: distroless doesn't have shell, so we create it at runtime
+# But we'll use a volume mount in production
+ENV DATA_FILE=/app/data/complaints.json
+
 # Default port (can be overridden by PORT env)
 ENV PORT=8045
 EXPOSE 8045

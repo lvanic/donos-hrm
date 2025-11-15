@@ -1,0 +1,59 @@
+{{define "admin"}}
+{{template "layout" .}}
+{{end}}
+
+{{define "page_title"}}Admin Panel{{end}}
+
+{{define "admin_body"}}
+<section class="container">
+    <h1>Admin Panel - Complaints Management</h1>
+    {{if not .Complaints}}
+    <p>No complaints submitted yet.</p>
+    {{else}}
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Subject</th>
+                <th>Reporter</th>
+                <th>Created</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Complaints}}
+            <tr class="{{if .Hidden}}hidden-row{{end}}">
+                <td>{{.ID}}</td>
+                <td>{{.Subject}}</td>
+                <td>{{.Reporter}}</td>
+                <td>{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
+                <td>
+                    {{if .Hidden}}
+                    <span class="status-hidden">Hidden</span>
+                    {{else}}
+                    <span class="status-visible">Visible</span>
+                    {{end}}
+                </td>
+                <td>
+                    <form method="post" action="/admin/toggle" style="display: inline;">
+                        <input type="hidden" name="id" value="{{.ID}}">
+                        <input type="hidden" name="hidden" value="{{if .Hidden}}false{{else}}true{{end}}">
+                        <button type="submit" class="btn-toggle {{if .Hidden}}btn-show{{else}}btn-hide{{end}}">
+                            {{if .Hidden}}Show{{else}}Hide{{end}}
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            <tr class="description-row {{if .Hidden}}hidden-row{{end}}">
+                <td colspan="6">
+                    <div class="complaint-description">{{.Description}}</div>
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+    {{end}}
+</section>
+{{end}}
+

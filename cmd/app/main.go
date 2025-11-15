@@ -10,7 +10,10 @@ import (
 
 	"donos-hrm/internal/auth"
 	"donos-hrm/internal/handlers"
+	"donos-hrm/internal/ratelimit"
 	"donos-hrm/internal/storage"
+	"time"
+
 	templ "donos-hrm/internal/templates"
 )
 
@@ -30,10 +33,38 @@ func main() {
 		log.Fatalf("load templates: %v", err)
 	}
 
-	store := storage.NewMemoryStore()
+	// Используем файловое хранилище
+	dataFile := os.Getenv("DATA_FILE")
+	if dataFile == "" {
+		dataFile = "data/complaints.json"
+	}
+	
+	// Создаем директорию если не существует
+	if err := os.MkdirAll("data", 0755); err != nil {
+		log.Fatalf("failed to create data directory: %v", err)
+	}
+
+	store, err := storage.NewFileStore(dataFile)
+	if err != nil {
+		log.Fatalf("failed to create file store: %v", err)
+	}
+	log.Printf("using data file: %s", dataFile)
+
 	authManager := auth.NewManager(clientID, clientSecret, baseURL)
 
-	h := handlers.New(tmpl, store, authManager)
+	// Rate limiter: 5 запросов в минуту по IP и email
+	rateLimiter := ratelimit.NewLimiter(ratelimit.Config{
+		MaxRequests: 5,
+		Window:      1 * time.Minute,
+		CleanupInt:  5 * time.Minute,
+	})
+
+	adminEmail := os.Getenv("ADMIN_EMAIL")
+	if adminEmail != "" {
+		log.Printf("admin email: %s", adminEmail)
+	}
+
+	h := handlers.New(tmpl, store, authManager, rateLimiter, adminEmail)
 
 	r := mux.NewRouter()
 	r.HandleFunc("/", h.RequireAuth(h.HandleForm())).Methods(http.MethodGet, http.MethodPost)
@@ -42,6 +73,10 @@ func main() {
 	r.HandleFunc("/login", h.HandleLogin()).Methods(http.MethodGet)
 	r.HandleFunc("/auth/google/callback", h.HandleCallback()).Methods(http.MethodGet)
 	r.HandleFunc("/logout", h.HandleLogout()).Methods(http.MethodPost)
+	
+	// Admin routes
+	r.HandleFunc("/admin", h.RequireAdmin(h.HandleAdmin())).Methods(http.MethodGet)
+	r.HandleFunc("/admin/toggle", h.RequireAdmin(h.HandleToggleHidden())).Methods(http.MethodPost)
 
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 

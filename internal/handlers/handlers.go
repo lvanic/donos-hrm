@@ -3,12 +3,15 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 
 	"donos-hrm/internal/auth"
+	"donos-hrm/internal/ratelimit"
 	"donos-hrm/internal/storage"
 )
 
@@ -16,16 +19,39 @@ type Handler struct {
 	tmpl        *template.Template
 	store       storage.Store
 	authManager *auth.Manager
+	rateLimiter *ratelimit.Limiter
+	adminEmail  string
 	stateMu     sync.Mutex
 	states      map[string]struct{}
 }
 
-func New(tmpl *template.Template, store storage.Store, authManager *auth.Manager) *Handler {
+func New(tmpl *template.Template, store storage.Store, authManager *auth.Manager, rateLimiter *ratelimit.Limiter, adminEmail string) *Handler {
 	return &Handler{
 		tmpl:        tmpl,
 		store:       store,
 		authManager: authManager,
+		rateLimiter: rateLimiter,
+		adminEmail:  adminEmail,
 		states:      make(map[string]struct{}),
+	}
+}
+
+func (h *Handler) IsAdmin(email string) bool {
+	return h.adminEmail != "" && strings.EqualFold(email, h.adminEmail)
+}
+
+func (h *Handler) RequireAdmin(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		email, ok := h.authManager.GetSession(r)
+		if !ok {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		if !h.IsAdmin(email) {
+			http.Error(w, "Access denied. Admin privileges required.", http.StatusForbidden)
+			return
+		}
+		next(w, r)
 	}
 }
 
@@ -74,18 +100,18 @@ func (h *Handler) HandleList() http.HandlerFunc {
 }
 
 func (h *Handler) HandleLogin() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return h.rateLimiter.Middleware(func(w http.ResponseWriter, r *http.Request) {
 		state := randomState()
 		h.stateMu.Lock()
 		h.states[state] = struct{}{}
 		h.stateMu.Unlock()
 		url := h.authManager.LoginURL(state)
 		http.Redirect(w, r, url, http.StatusTemporaryRedirect)
-	}
+	})
 }
 
 func (h *Handler) HandleCallback() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return h.rateLimiter.Middleware(func(w http.ResponseWriter, r *http.Request) {
 		state := r.URL.Query().Get("state")
 		if !h.consumeState(state) {
 			http.Error(w, "invalid state", http.StatusBadRequest)
@@ -113,13 +139,28 @@ func (h *Handler) HandleCallback() http.HandlerFunc {
 			http.Error(w, "login failed", http.StatusInternalServerError)
 			return
 		}
+
+		// Проверка на наличие "pynest" в email
+		if !strings.Contains(strings.ToLower(email), "pynest") {
+			log.Printf("access denied: email %s does not contain 'pynest'", email)
+			http.Error(w, "Access denied. Only emails containing 'pynest' are allowed.", http.StatusForbidden)
+			return
+		}
+
+		// Rate limiting по email
+		if !h.rateLimiter.CheckEmail(email) {
+			log.Printf("rate limit exceeded for email: %s", email)
+			http.Error(w, "Too many requests from this email. Please try again later.", http.StatusTooManyRequests)
+			return
+		}
+
 		if _, err := h.authManager.CreateSession(w, email); err != nil {
 			log.Printf("session creation failed: %v", err)
 			http.Error(w, "login failed", http.StatusInternalServerError)
 			return
 		}
 		http.Redirect(w, r, "/", http.StatusSeeOther)
-	}
+	})
 }
 
 func (h *Handler) HandleLogout() http.HandlerFunc {
@@ -153,6 +194,7 @@ func (h *Handler) viewData(email, title, bodyTemplate string, extras ...map[stri
 		"Title":           title,
 		"Email":           email,
 		"ContentTemplate": bodyTemplate,
+		"IsAdmin":         h.IsAdmin(email),
 	}
 	for _, extra := range extras {
 		for k, v := range extra {
@@ -173,6 +215,57 @@ func (h *Handler) consumeState(state string) bool {
 	}
 	delete(h.states, state)
 	return true
+}
+
+func (h *Handler) HandleAdmin() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		email, _ := h.authManager.GetSession(r)
+		complaints, err := h.store.ListAll()
+		if err != nil {
+			http.Error(w, "failed to list complaints", http.StatusInternalServerError)
+			return
+		}
+		h.renderTemplate(w, "layout", h.viewData(email, "Admin Panel", "admin", map[string]any{
+			"Complaints": complaints,
+			"IsAdmin":    true,
+		}))
+	}
+}
+
+func (h *Handler) HandleToggleHidden() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form", http.StatusBadRequest)
+			return
+		}
+
+		idStr := r.FormValue("id")
+		if idStr == "" {
+			http.Error(w, "id required", http.StatusBadRequest)
+			return
+		}
+
+		var id int
+		if _, err := fmt.Sscanf(idStr, "%d", &id); err != nil {
+			http.Error(w, "invalid id", http.StatusBadRequest)
+			return
+		}
+
+		hidden := r.FormValue("hidden") == "true"
+
+		if err := h.store.SetHidden(id, hidden); err != nil {
+			log.Printf("failed to toggle hidden: %v", err)
+			http.Error(w, "failed to update", http.StatusInternalServerError)
+			return
+		}
+
+		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+	}
 }
 
 func randomState() string {
